@@ -2,6 +2,32 @@
 
 // Three Dragon Ante - Roll20 API Script
 // See README.md for game rules and scoring examples.
+
+/**
+ * @typedef {Object} Rolls
+ * @property {number[]} d8
+ * @property {number} [d6]
+ * @property {number} [d4]
+ */
+
+/**
+ * @typedef {Object} Participant
+ * @property {string} id
+ * @property {string} charName
+ * @property {string} seatOwnerId
+ * @property {string} seatOwnerName
+ * @property {boolean} active
+ * @property {Rolls} rolls
+ * @property {string} [passedAt]
+ */
+
+/**
+ * @typedef {Object} GameState
+ * @property {string} stage
+ * @property {string} createdBy
+ * @property {Record<string, Participant>} participants
+ */
+
 (function () {
   const MODULE = 'Three Dragon Ante';
   const CMD = '!tda';
@@ -169,12 +195,17 @@
     ]
   };
 
+  /**
+   * @param {string} str
+   * @param {Record<string, any>} [vars]
+   */
   function fmt(str, vars) {
     return String(str).replace(/\{(\w+)\}/g, function (_, k) { return vars && vars[k] != null ? String(vars[k]) : '{' + k + '}'; });
   }
 
+  /** @param {string} stage */
   function stageLabel(stage) {
-    return MSG.stageLabel[stage] || stage;
+    return MSG.stageLabel[/** @type {keyof typeof MSG.stageLabel} */ (stage)] || stage;
   }
 
   // Ensure persistent state bucket
@@ -184,6 +215,7 @@
     return state.TDA;
   }
 
+  /** @param {string} msg */
   function say(msg) {
     if (msg && msg.charAt(0) === '/') {
       sendChat(MODULE_SPEAKER_DESCRIPTION, msg);
@@ -191,10 +223,15 @@
       sendChat(MODULE_SPEAKER, msg);
     }
   }
+  /**
+   * @param {string} playerName
+   * @param {string} msg
+   */
   function whisper(playerName, msg) {
     sendChat(MODULE_SPEAKER, '/w "' + playerName + '" ' + msg);
   }
 
+  /** @param {any[]} arr */
   function randomPick(arr) {
     return arr[randomInteger(arr.length) - 1];
   }
@@ -210,37 +247,50 @@
     return tensionEnding;
   }
 
+  /** @param {string} base */
   function spiceDesc(base) {
     say('/desc ' + base + ' ' + tensionEnding());
   }
 
+  /** @param {string} playerid */
   function isGM(playerid) {
     return playerIsGM(playerid);
   }
 
+  /**
+   * @param {string} playerid
+   * @param {string} [fallback]
+   */
   function getPlayerName(playerid, fallback) {
     var p = getObj('player', playerid);
     return (p && p.get('displayname')) || fallback || 'Player';
   }
 
+  /**
+   * @param {number} sides
+   * @param {number} n
+   */
   function rollN(sides, n) {
     var arr = [];
     for (var i = 0; i < n; i++) arr.push(randomInteger(sides));
     return arr;
   }
 
+  /** @param {string} query */
+  /** @param {string} query */
   function getCharByQuery(query) {
     if (!query) return null;
     var idMatch = query.match(/^@?([-A-Za-z0-9_]+)$/);
+    /** @type {Character | null} */
     var char = null;
     if (idMatch) {
-      char = getObj('character', idMatch[1]);
+      char = /** @type {Character | undefined} */ (getObj('character', idMatch[1])) || null;
       if (char) return char;
     }
-    var found = findObjs({ type: 'character', name: query });
+    var found = /** @type {Character[]} */ (findObjs({ type: 'character', name: query }));
     if (found && found.length) return found[0];
     // Try case-insensitive partial match
-    var all = findObjs({ type: 'character' }) || [];
+    var all = /** @type {Character[]} */ (findObjs({ type: 'character' }) || []);
     var lowered = query.toLowerCase();
     for (var i = 0; i < all.length; i++) {
       var nm = (all[i].get('name') || '').toLowerCase();
@@ -249,15 +299,18 @@
     return null;
   }
 
+  /** @param {Character} char */
   function getCharacterControllers(char) {
-    var ctrl = (char.get('controlledby') || '').split(',').filter(function (s) { return !!s; });
+    var ctrl = (char.get('controlledby') || '').split(',').filter(/** @param {string} s */ function (s) { return !!s; });
     return ctrl; // array of playerids or 'all'
   }
 
+  /** @param {ChatMessage} msg */
   function getCharFromSelection(msg) {
     try {
       var sel = msg && msg.selected;
       if (sel && sel.length) {
+        /** @type {Record<string, boolean>} */
         var map = {};
         for (var i = 0; i < sel.length; i++) {
           var it = sel[i];
@@ -271,7 +324,7 @@
         }
         var ids = Object.keys(map);
         if (ids.length === 1) {
-          return getObj('character', ids[0]);
+          return /** @type {Character | undefined} */ (getObj('character', ids[0]));
         }
       }
     } catch (e) {
@@ -283,7 +336,7 @@
       if (sa && typeof sa === 'string' && sa.indexOf('character|') === 0) {
         var cid2 = sa.split('|')[1];
         if (cid2) {
-          return getObj('character', cid2);
+          return /** @type {Character | undefined} */ (getObj('character', cid2));
         }
       }
     } catch (e2) {
@@ -292,14 +345,20 @@
     return null;
   }
 
+  /** @param {Participant} p */
   function participantLabel(p) {
     return p.charName;
   }
 
+  /**
+   * @param {Participant} p
+   * @param {string} text
+   */
   function whisperSeat(p, text) {
     whisper(p.seatOwnerName, text);
   }
 
+  /** @param {GameState} g */
   function listParticipants(g) {
     var parts = Object.values(g.participants);
     if (!parts.length) return MSG.common.none;
@@ -308,6 +367,7 @@
     return actives.concat(dropped).join(', ');
   }
 
+  /** @param {GameState} g */
   function doRollsForStage(g) {
     var players = Object.values(g.participants).filter(function (p) { return p.active; });
     if (!players.length) return;
@@ -336,10 +396,12 @@
     }
   }
 
+  /** @param {GameState} g */
   function activeCount(g) {
     return Object.values(g.participants).filter(function (p) { return p.active; }).length;
   }
 
+  /** @param {GameState} g */
   function finalizeAndAnnounce(g) {
     g.stage = STAGES.FINISHED;
     var finalists = Object.values(g.participants).filter(function (p) { return p.active; });
@@ -374,6 +436,7 @@
     }
   }
 
+  /** @param {GameState} g */
   function finishIfAuto(g) {
     var count = activeCount(g);
     if (count <= 1) {
@@ -383,6 +446,10 @@
     return false;
   }
 
+  /**
+   * @param {GameState} g
+   * @param {boolean} [force]
+   */
   function proceed(g, force) {
     if (force === void 0) force = false;
     switch (g.stage) {
@@ -424,11 +491,14 @@
     }
   }
 
+  /** @param {Rolls} rolls */
   function computeScore(rolls) {
+    /** @type {number[]} */
     var values = [];
     if (rolls.d8) values = values.concat(rolls.d8);
     if (typeof rolls.d6 === 'number') values.push(rolls.d6);
     if (typeof rolls.d4 === 'number') values.push(rolls.d4);
+    /** @type {Record<number, number>} */
     var counts = {};
     values.forEach(function (v) { counts[v] = (counts[v] || 0) + 1; });
     var total = 0;
@@ -441,14 +511,19 @@
     return total;
   }
 
+  /** @param {Rolls} rolls */
   function comboSummary(rolls) {
+    /** @type {number[]} */
     var values = [];
     if (rolls.d8) values = values.concat(rolls.d8);
     if (typeof rolls.d6 === 'number') values.push(rolls.d6);
     if (typeof rolls.d4 === 'number') values.push(rolls.d4);
+    /** @type {Record<number, number>} */
     var counts = {};
     values.forEach(function (v) { counts[v] = (counts[v] || 0) + 1; });
+    /** @type {number[]} */
     var doubles = [];
+    /** @type {number[]} */
     var triples = [];
     Object.keys(counts).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; }).forEach(function (v) {
       if (counts[v] === 2) doubles.push(v);
@@ -460,6 +535,7 @@
     return parts.length ? parts.join('; ') : MSG.combos.none;
   }
 
+  /** @param {Participant} p */
   function summarizeRolls(p) {
     var parts = [];
     if (p.rolls.d8 && p.rolls.d8.length) parts.push(p.rolls.d8.join(', '));
@@ -468,6 +544,10 @@
     return parts.join(', ');
   }
 
+  /**
+   * @param {Participant} p
+   * @param {GameState} g
+   */
   function passForParticipant(p, g) {
     if (!p.active) return false;
     if ([STAGES.PASS_D8, STAGES.PASS_D6, STAGES.PASS_D4].indexOf(g.stage) === -1) return 'notOnStage';
@@ -477,6 +557,7 @@
     return true;
   }
 
+  /** @param {GameState} g */
   function status(g) {
     var stage = stageLabel(g.stage);
     var list = listParticipants(g);
@@ -512,6 +593,7 @@
       return true;
     }
 
+    /** @param {string} charId */
     function findSeatByCharId(charId) {
       return g && g.participants && g.participants[charId];
     }
@@ -641,6 +723,10 @@
   function dealerRulesIntro() {
     say(MSG.rules.intro1);
     say(MSG.rules.intro2);
+  }
+
+  if (typeof __TEST_MODE__ !== 'undefined' && __TEST_MODE__) {
+    globalThis.__TEST_EXPORTS__ = { computeScore: computeScore, comboSummary: comboSummary };
   }
 })();
 

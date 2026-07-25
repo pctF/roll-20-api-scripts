@@ -48,7 +48,7 @@ This aligns with the examples below and ensures that a 4‑ or 5‑of‑a‑kind
 | 1  | 3  | 2  | 2  | 1  | 15    | two doubles: 1(d8)×2 + 1(d4)×2 + 2(d8)×2 + 2(d6)×2          |
 | 1  | 5  | 4  | 4  | 4  | 42    | triple: 4(d8)×3 + 4(d6)×3 + 4(d4)×3                         |
 | 1  | 4  | 4  | 4  | 4  | 41    | treat as one triple + singles: 4×3 + 4×3 + 4×3 + 4 + 1 = 41 |
-| 4  | 4  | 4  | 4  | 4  | 41    | triple + double: 4×3 + 4×3 + 4×3 + 4×2 + 4×2 = 41           |
+| 4  | 4  | 4  | 4  | 4  | 44    | triple + singles: 4×3 + 4×3 + 4×3 + 4 + 4 = 44               |
 
 ## Commands
 

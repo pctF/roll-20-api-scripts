@@ -104,6 +104,7 @@ declare global {
     rolltemplate?: string;
     original?: string;
     target?: string;
+    speakingas?: string;
   }
 
   // Core event system
