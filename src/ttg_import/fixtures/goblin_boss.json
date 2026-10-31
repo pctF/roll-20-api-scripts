@@ -1,0 +1,119 @@
+{
+ "name": {
+  "rus": "Босс гоблинов",
+  "eng": "Goblin Boss"
+ },
+ "size": {
+  "rus": "Маленький",
+  "eng": "small",
+  "cell": "1 клетка"
+ },
+ "type": {
+  "name": "гуманоид",
+  "tags": [
+   "гоблиноид"
+  ]
+ },
+ "challengeRating": "1",
+ "url": "/bestiary/goblin_boss",
+ "source": {
+  "shortName": "MM",
+  "name": "Бестиарий",
+  "group": {
+   "name": "Официальные источники",
+   "shortName": "Basic"
+  }
+ },
+ "id": 404,
+ "experience": 200,
+ "proficiencyBonus": "2",
+ "alignment": "нейтрально-злой",
+ "armorClass": 17,
+ "armors": [
+  {
+   "name": "кольчужная рубаха",
+   "type": "armor",
+   "url": "/armors/chain_shirt"
+  },
+  {
+   "name": "щит",
+   "type": "armor",
+   "url": "/armors/shield"
+  }
+ ],
+ "hits": {
+  "average": 21,
+  "formula": "6к6"
+ },
+ "speed": [
+  {
+   "value": 30
+  }
+ ],
+ "ability": {
+  "str": 10,
+  "dex": 14,
+  "con": 10,
+  "int": 10,
+  "wiz": 8,
+  "cha": 10
+ },
+ "skills": [
+  {
+   "name": "Скрытность",
+   "value": 6
+  }
+ ],
+ "senses": {
+  "passivePerception": "9",
+  "senses": [
+   {
+    "name": "тёмное зрение",
+    "value": 60
+   }
+  ]
+ },
+ "languages": [
+  "Гоблинский",
+  "Общий"
+ ],
+ "feats": [
+  {
+   "name": "Ловкий побег",
+   "value": "<p>Гоблин может в каждом своём ходу <em>бонусным действием</em> совершать действие <detail-tooltip type=\"screen\"><a href=\"/screens/hide\">Засада</a></detail-tooltip> или <detail-tooltip type=\"screen\"><a href=\"/screens/disengage\">Отход</a></detail-tooltip>.</p>",
+   "markdown": false
+  }
+ ],
+ "actions": [
+  {
+   "name": "Мультиатака",
+   "englishName": "Multiattack",
+   "value": "<p>Гоблин совершает две атаки <strong>Скимитаром</strong>. Вторая атака совершается с <span class=\"disadvantage\">помехой</span>.</p>",
+   "markdown": false
+  },
+  {
+   "name": "Скимитар",
+   "value": "<p><em>Рукопашная атака оружием:</em> <dice-roller label=\"Атака\" formula=\"к20 + 4\">+4</dice-roller> к попаданию, досягаемость 5 фт., одна цель. <em>Попадание:</em>&nbsp;5&nbsp;(<dice-roller label=\"Урон\" formula=\"1к6 + 2\"/>) рубящего урона.</p>",
+   "markdown": true
+  },
+  {
+   "name": "Метательное копьё",
+   "englishName": "Javelin",
+   "value": "<p><em>Дальнобойная или рукопашная атака оружием:</em> <dice-roller label=\"Атака\" formula=\"к20 + 2\">+2</dice-roller> к попаданию, досягаемость 5 фт. или дистанция 30/120 фт., одна цель. <em>Попадание:</em>&nbsp;3&nbsp;(<dice-roller label=\"Урон\" formula=\"1к6\"/>) колющего урона.</p>",
+   "markdown": true
+  }
+ ],
+ "reactions": [
+  {
+   "name": "Перенаправление атаки",
+   "value": "<p>Если существо, видимое гоблином, нацеливается на него атакой, гоблин выбирает другого гоблина в пределах 5 футов от себя. Эти два гоблина меняются местами, и целью становится выбранный гоблин.</p>",
+   "markdown": false
+  }
+ ],
+ "environment": [
+  "лес",
+  "равнина/луг",
+  "холмы",
+  "подземье"
+ ]
+}

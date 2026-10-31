@@ -1,0 +1,189 @@
+{
+ "name": {
+  "rus": "Взрослый красный дракон",
+  "eng": "Adult Red Dragon"
+ },
+ "size": {
+  "rus": "Огромный",
+  "eng": "huge",
+  "cell": "3x3 клетки"
+ },
+ "type": {
+  "name": "дракон",
+  "tags": [
+   "цветной"
+  ]
+ },
+ "challengeRating": "17",
+ "url": "/bestiary/adult_red_dragon",
+ "source": {
+  "shortName": "MM",
+  "name": "Бестиарий",
+  "group": {
+   "name": "Официальные источники",
+   "shortName": "Basic"
+  }
+ },
+ "id": 378,
+ "experience": 18000,
+ "proficiencyBonus": "6",
+ "alignment": "хаотично-злой",
+ "armorClass": 19,
+ "armors": [
+  {
+   "name": "природный доспех",
+   "type": "armor",
+   "url": null
+  }
+ ],
+ "hits": {
+  "average": 256,
+  "formula": "19к12",
+  "sign": " + ",
+  "bonus": 133
+ },
+ "speed": [
+  {
+   "value": 40
+  },
+  {
+   "name": "летая",
+   "value": 80
+  },
+  {
+   "name": "лазая",
+   "value": 40
+  }
+ ],
+ "ability": {
+  "str": 27,
+  "dex": 10,
+  "con": 25,
+  "int": 16,
+  "wiz": 13,
+  "cha": 21
+ },
+ "savingThrows": [
+  {
+   "name": "Ловкость",
+   "shortName": "Лов",
+   "value": 6
+  },
+  {
+   "name": "Телосложение",
+   "shortName": "Тел",
+   "value": 13
+  },
+  {
+   "name": "Мудрость",
+   "shortName": "Мдр",
+   "value": 7
+  },
+  {
+   "name": "Харизма",
+   "shortName": "Хар",
+   "value": 11
+  }
+ ],
+ "skills": [
+  {
+   "name": "Внимательность",
+   "value": 13
+  },
+  {
+   "name": "Скрытность",
+   "value": 6
+  }
+ ],
+ "damageImmunities": [
+  "огонь"
+ ],
+ "senses": {
+  "passivePerception": "23",
+  "senses": [
+   {
+    "name": "тёмное зрение",
+    "value": 120
+   },
+   {
+    "name": "слепое зрение",
+    "value": 60
+   }
+  ]
+ },
+ "languages": [
+  "Драконий",
+  "Общий"
+ ],
+ "feats": [
+  {
+   "name": "Легендарное сопротивление (3/день)",
+   "englishName": "Legendary Resistance",
+   "value": "<p>Если дракон проваливает спасбросок, он может вместо этого сделать спасбросок успешным.</p>",
+   "markdown": false
+  }
+ ],
+ "actions": [
+  {
+   "name": "Мультиатака",
+   "englishName": "Multiattack",
+   "value": "<p>Дракон может использовать Ужасающую внешность. Затем он совершает три атаки: одну <strong>Укусом</strong> и две <strong>Когтями</strong>.</p>",
+   "markdown": false
+  },
+  {
+   "name": "Укус",
+   "englishName": "Bite",
+   "value": "<p><em>Рукопашная атака оружием:</em> <dice-roller label=\"Атака\" formula=\"к20 + 14\">+14</dice-roller> к попаданию, досягаемость 10 фт., одна цель. <em>Попадание:</em>&nbsp;19&nbsp;(<dice-roller label=\"Урон\" formula=\"2к10 + 8\"/>) колющего урона плюс 7&nbsp;(<dice-roller label=\"Урон\" formula=\"2к6\"/>) урона огнём.</p>",
+   "markdown": true
+  },
+  {
+   "name": "Коготь",
+   "englishName": "Claw",
+   "value": "<p><em>Рукопашная атака оружием:</em> <dice-roller label=\"Атака\" formula=\"к20 + 14\">+14</dice-roller> к попаданию, досягаемость 5 фт., одна цель. <em>Попадание:</em>&nbsp;15&nbsp;(<dice-roller label=\"Урон\" formula=\"2к6 + 8\"/>) рубящего урона.</p>",
+   "markdown": true
+  },
+  {
+   "name": "Хвост",
+   "englishName": "Tail",
+   "value": "<p><em>Рукопашная атака оружием:</em> <dice-roller label=\"Атака\" formula=\"к20 + 14\">+14</dice-roller> к попаданию, досягаемость 15 фт., одна цель. <em>Попадание:</em>&nbsp;17&nbsp;(<dice-roller label=\"Урон\" formula=\"2к8 + 8\"/>) дробящего урона.</p>",
+   "markdown": true
+  },
+  {
+   "name": "Ужасающая внешность",
+   "value": "<p>Все существа на выбор дракона, находящиеся в пределах 120 футов от него и знающие о его присутствии, должны преуспеть в спасброске <span class=\"saving_throw\">Мудрости</span> со Сл&nbsp;19, иначе станут <detail-tooltip type=\"screen\"><a href=\"/screens/frightened\" >испуганными</a></detail-tooltip> на 1&nbsp;минуту.</p><p>Существо может повторять этот спасбросок в конце каждого своего хода, оканчивая эффект на себе при успехе. Если спасбросок существа был успешным, или эффект на нём окончился, оно получает иммунитет к Ужасающей внешности этого дракона на следующие 24 часа.</p>",
+   "markdown": false
+  },
+  {
+   "name": "Огненное дыхание (перезарядка 5–6)",
+   "value": "<p>Дракон выдыхает огонь 60-футовым конусом. Все существа в этой области должны совершить спасбросок <span class=\"saving_throw\">Ловкости</span> со Сл&nbsp;21, получая 63&nbsp;(<dice-roller label=\"Урон\" formula=\"18к6\"/>) урона огнём при провале, или половину этого урона при успехе.</p>",
+   "markdown": true
+  }
+ ],
+ "legendary": {
+  "list": [
+   {
+    "name": "Обнаружение",
+    "englishName": "Detect",
+    "value": "<p>Дракон совершает проверку <detail-tooltip type=\"screen\"><a href=\"/screens/perception\"><em>Мудрости (Внимательность)</em></a></detail-tooltip>.</p>",
+    "markdown": false
+   },
+   {
+    "name": "Атака хвостом",
+    "englishName": "Tail Attack",
+    "value": "<p>Дракон совершает атаку <strong>Хвостом</strong>.</p>",
+    "markdown": false
+   },
+   {
+    "name": "Атака крыльями (стоит 2 действия)",
+    "englishName": "Wing Attack",
+    "value": "<p>Дракон бьёт своими крыльями. Все существа в пределах 10 футов от дракона должны преуспеть в спасброске <span class=\"saving_throw\">Ловкости</span> со Сл&nbsp;22, иначе получат 15&nbsp;(<dice-roller label=\"Урон\" formula=\"2к6 + 8\"/>) дробящего урона и будут <detail-tooltip type=\"screen\"><a href=\"/screens/condition_prone\" >сбиты с ног</a></detail-tooltip>. После этого дракон может пролететь на расстояние, не превышающее половину скорости полёта.</p>",
+    "markdown": true
+   }
+  ],
+  "count": 0
+ },
+ "environment": [
+  "пустыня",
+  "горы"
+ ]
+}

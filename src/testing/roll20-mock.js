@@ -49,6 +49,10 @@ function makeObj(type, attrs) {
         data[propsOrKey] = value;
       }
     },
+    // Sheet workers aren't simulated; same as set().
+    setWithWorker(/** @type {Record<string, any>} */ props) {
+      Object.assign(data, props);
+    },
     remove() {
       data.__removed = true;
     },
@@ -125,6 +129,9 @@ export function createSandbox(options = {}) {
     filterObjs,
     getAllObjs,
     createObj: (/** @type {string} */ type, /** @type {Record<string, any>} */ attrs) => addObj(type, attrs),
+    // Real Roll20 stores a token blob on the character; the mock records the token's id there.
+    setDefaultTokenForCharacter: (/** @type {any} */ character, /** @type {any} */ graphic) =>
+      character.set('_defaulttoken', graphic.id),
     playerIsGM,
     randomInteger,
     state,
@@ -164,6 +171,8 @@ export function createSandbox(options = {}) {
         })
       );
     },
+    /** Same as the script-side findObjs(), for asserting on created objects. */
+    findObjs,
     addCharacter: (/** @type {Record<string, any>} */ attrs) => addObj('character', attrs),
     addPlayer: (/** @type {Record<string, any>} */ attrs) => addObj('player', attrs),
     addGraphic: (/** @type {Record<string, any>} */ attrs) => addObj('graphic', attrs),

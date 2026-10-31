@@ -54,6 +54,8 @@ declare global {
   }
   interface Attribute extends Roll20Object {
     _type: "attribute";
+    /** Like set(), but also fires the character sheet's sheet workers. */
+    setWithWorker(props: Record<string, any>): void;
   }
   interface Page extends Roll20Object {
     _type: "page";
