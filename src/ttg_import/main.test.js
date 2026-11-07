@@ -21,11 +21,15 @@ function command(data) {
   return '!ttg ' + JSON.stringify(data).replace(/[%<>&"\[\]{}@#|\\]/g, encodeURIComponent);
 }
 
-/** Imports `data` as GM; returns the sandbox, created character and its attributes by name. @param {any} data */
-function runImport(data) {
+/**
+ * Imports `data` as GM; returns the sandbox, created character and its attributes by name.
+ * @param {any} data
+ * @param {string} [content] chat message, defaults to the ttg command for `data`
+ */
+function runImport(data, content = command(data)) {
   const sandbox = createSandbox({ gmPlayerIds: ['gm1'] });
   sandbox.loadScript(mainPath);
-  sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM (GM)', content: command(data) });
+  sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM (GM)', content });
   const [char] = sandbox.findObjs({ type: 'character' });
   /** @type {Record<string, any>} */
   const attrs = {};
@@ -207,4 +211,175 @@ test('magic item requiring attunement says so', () => {
   sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM', content: command(fixture('ring_of_protection')) });
   const [h] = sandbox.findObjs({ type: 'handout' });
   assert.match(h.get('notes'), /^<p><i>кольцо, редкое \(требуется настройка\)<\/i><\/p>/);
+});
+
+// ---- dnd.su ----
+
+const readme = readFileSync(fileURLToPath(new URL('./README.md', import.meta.url)), 'utf8');
+const dndsuBookmarkletCode = readme.match(/^\s*javascript:(\(async\(\)=>\{const c=document\.querySelector\('\.card\.active.*)$/m)?.[1];
+
+/**
+ * Runs the README's dnd.su bookmarklet on a fake page holding fixture `f`'s card; returns the copied text.
+ * @param {{ id: string, name: string, html: string }} f
+ */
+async function dndsuBookmarklet(f) {
+  assert.ok(dndsuBookmarkletCode, 'dnd.su bookmarklet not found in README');
+  let copied = '';
+  const card = {
+    dataset: { id: f.id },
+    querySelector: (/** @type {string} */ sel) => (sel === '.card__body' ? { innerHTML: f.html } : { dataset: { copy: f.name } }),
+  };
+  const document = { querySelector: () => card };
+  const navigator = { clipboard: { writeText: async (/** @type {string} */ t) => void (copied = t) } };
+  await new Function('document', 'navigator', 'alert', 'return ' + dndsuBookmarkletCode)(document, navigator, () => {});
+  return copied;
+}
+
+/** @param {string} name dnd.su fixture name without the "dndsu_" prefix */
+async function runDndSu(name) {
+  return runImport(null, await dndsuBookmarklet(fixture('dndsu_' + name)));
+}
+
+test('dnd.su: githyanki supreme commander through the README bookmarklet', async () => {
+  const content = await dndsuBookmarklet(fixture('dndsu_githyanki_supreme_commander'));
+  assert.match(content, /^!dndsu %7B%22id%22:%22bestiary:8259%22/);
+  assert.ok(content.length < 6000, `payload ${content.length} chars`);
+
+  const { sandbox, char, attrs } = runImport(null, content);
+  assert.equal(char.get('name'), 'Гитъянки главнокомандующий');
+  assert.equal(attrs.npc_type, 'Средний Гуманоид (гит), любое мировоззрение');
+  assert.equal(attrs.npc_ac, '18');
+  assert.equal(attrs.npc_actype, 'латы');
+  assert.equal(attrs.hp, '187');
+  assert.equal(attrs.npc_hpformula, '22d8 + 88');
+  assert.equal(attrs.npc_speed, '30 футов');
+  assert.equal(attrs.strength_base, '19');
+  assert.equal(attrs.wisdom_base, '16');
+  assert.equal(attrs.npc_con_save_base, '9');
+  assert.equal(attrs.npc_dex_save_flag, undefined);
+  assert.equal(attrs.npc_perception_base, '8');
+  assert.equal(attrs.npc_intimidation_base, '9');
+  assert.equal(attrs.npc_insight_base, '8');
+  assert.equal(attrs.npc_senses, 'пассивное Восприятие 18');
+  assert.equal(attrs.npc_languages, 'Гитский');
+  assert.equal(attrs.npc_challenge, '14');
+  assert.equal(attrs.npc_xp, '11500');
+
+  assert.deepEqual(
+    rows(attrs, 'npctrait').map((t) => t.name),
+    ['Легендарное сопротивление (3/день)']
+  );
+  const actions = rows(attrs, 'npcaction');
+  assert.deepEqual(
+    actions.map((a) => a.name),
+    ['Мультиатака', 'Серебряный двуручный меч', 'Использование заклинаний (Псионика)']
+  );
+  assert.equal(actions[1].attack_tohit, '12');
+  assert.equal(actions[1].attack_range, 'досягаемость 5 футов');
+  assert.equal(actions[1].attack_damage, '2d6 + 7');
+  assert.equal(actions[1].attack_damagetype, 'рубящего');
+  assert.equal(actions[1].attack_damage2, '5d6');
+  assert.equal(actions[1].attack_damagetype2, 'психической энергией');
+  // spell list paragraphs stay with the spellcasting entry
+  assert.match(actions[2].description, /\n1\/день каждое: длань Бигби/);
+  assert.equal(rows(attrs, 'npcbonusaction')[0].name, 'Астральный шаг');
+  assert.equal(rows(attrs, 'npcreaction')[0].name, 'Парирование');
+  assert.equal(attrs.npc_legendary_actions, '3');
+  assert.deepEqual(
+    rows(attrs, 'npcaction-l').map((a) => a.name),
+    ['Приказ союзникам', 'Атака (2 действия)']
+  );
+  assert.match(char.get('bio'), /^Главнокомандующие управляют армиями/);
+  assert.match(sandbox.getWhispers()[0].message, new RegExp(`journal.roll20.net/character/${char.id}`));
+});
+
+test('dnd.su: adult red dragon, damage type before dice, lair goes to bio after description', async () => {
+  const { attrs, char } = await runDndSu('adult_red_dragon');
+  assert.equal(attrs.npc_type, 'Огромный Дракон, хаотично-злой');
+  assert.equal(attrs.npc_speed, '40 футов, летая 80 футов, лазая 40 футов');
+  assert.equal(attrs.npc_immunities, 'огонь');
+  assert.equal(attrs.npc_senses, 'слепое зрение 60 футов, тёмное зрение 120 футов, пассивное Восприятие 23');
+  const bite = rows(attrs, 'npcaction')[1];
+  assert.equal(bite.name, 'Укус');
+  assert.equal(bite.attack_damage, '2d10 + 8');
+  assert.equal(bite.attack_damagetype, 'колющий');
+  assert.equal(bite.attack_damage2, '2d6');
+  assert.equal(bite.attack_damagetype2, 'огнём');
+  assert.equal(rows(attrs, 'npcaction-l').length, 3);
+  assert.match(char.get('bio'), /^Наиболее алчные из истинных драконов/);
+  assert.match(char.get('bio'), /<br>Логово<br>Красные драконы устраивают/);
+  assert.match(char.get('bio'), /<br>• Магма вырывается/);
+});
+
+test('dnd.su: lich spell list, resistances, condition immunities, 4 legendary actions', async () => {
+  const { attrs } = await runDndSu('lich');
+  assert.equal(attrs.npc_resistances, 'некротическая энергия, холод, электричество');
+  assert.equal(attrs.npc_immunities, 'яд; дробящий, колющий, рубящий от немагических атак');
+  assert.equal(attrs.npc_condition_immunities, 'паралич, очарование, отравление, истощение, испуг');
+  assert.equal(attrs.npc_xp, '33000');
+  const spells = rows(attrs, 'npctrait').find((t) => t.name === 'Использование заклинаний');
+  assert.match(spells?.desc, /\n• 9 уровень \(1 ячейка\): слово силы: смерть \[power word kill\]\.$/);
+  assert.deepEqual(
+    rows(attrs, 'npctrait').map((t) => t.name),
+    ['Легендарное сопротивление (3/день)', 'Восстановление', 'Использование заклинаний', 'Сопротивление изгнанию']
+  );
+  const touch = rows(attrs, 'npcaction')[0];
+  assert.equal(touch.attack_target, 'одно существо');
+  assert.equal(touch.attack_damagetype, 'холодом');
+  assert.equal(rows(attrs, 'npcaction-l').length, 4);
+});
+
+test('dnd.su: wolf, fractional CR, no saves or legendary actions', async () => {
+  const { attrs } = await runDndSu('wolf');
+  assert.equal(attrs.npc_challenge, '1/4');
+  assert.equal(attrs.npc_xp, '50');
+  assert.equal(attrs.npc_saving_flag, undefined);
+  assert.equal(attrs.npc_legendary_actions, undefined);
+  assert.equal(attrs.npc_hpformula, '2d8 + 2');
+  assert.deepEqual(
+    rows(attrs, 'npctrait').map((t) => t.name),
+    ['Острый слух и тонкий нюх', 'Тактика стаи']
+  );
+});
+
+test('dnd.su: magic items become handouts with type, rarity and price', async () => {
+  for (const [name, notes] of [
+    [
+      'ring_of_protection',
+      '<p><i>Кольцо, редкое (требуется настройка)</i></p><p><i>Рекомендованная стоимость: 501-5\u2009000 зм</i></p><p>Вы получаете бонус +1 к КД',
+    ],
+    ['flame_tongue', '<p><i>Оружие (любой меч), редкое (требуется настройка)</i></p><p><i>Рекомендованная'],
+  ]) {
+    const sandbox = createSandbox({ gmPlayerIds: ['gm1'] });
+    sandbox.loadScript(mainPath);
+    sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM', content: await dndsuBookmarklet(fixture('dndsu_' + name)) });
+    const [h] = sandbox.findObjs({ type: 'handout' });
+    assert.ok(h.get('notes').startsWith(notes), h.get('notes'));
+    assert.equal(sandbox.findObjs({ type: 'character' }).length, 0);
+  }
+});
+
+test('dnd.su: other pages and garbage create nothing', () => {
+  const sandbox = createSandbox({ gmPlayerIds: ['gm1'] });
+  sandbox.loadScript(mainPath);
+  const spell = JSON.stringify({ id: 'spells:26', name: 'Волшебная рука', html: '<ul><li>x</li></ul>' });
+  sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM', content: '!dndsu ' + encodeURIComponent(spell) });
+  sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM', content: '!dndsu ' + encodeURIComponent(JSON.stringify(fixture('goblin_boss'))) });
+  sandbox.fireChatMessage({ playerid: 'gm1', who: 'GM', content: '!dndsu' });
+  assert.equal(sandbox.findObjs({ type: 'character' }).length + sandbox.findObjs({ type: 'handout' }).length, 0);
+  assert.deepEqual(
+    sandbox.getWhispers().map((w) => w.message.slice(0, 20)),
+    ['Это не монстр или ма', 'Это не монстр или ма', 'Использование: откро']
+  );
+});
+
+test('simplifyDndSu is idempotent, so the script can re-apply it to bookmarklet output', () => {
+  const sandbox = createSandbox();
+  sandbox.loadScript(mainPath);
+  const simplify = sandbox.exports()?.simplifyDndSu;
+  for (const name of ['adult_red_dragon', 'lich', 'flame_tongue']) {
+    const once = simplify(fixture('dndsu_' + name).html);
+    assert.equal(simplify(once), once);
+    assert.doesNotMatch(once, /<(?!\/?(li|h3|p|strong|em|b|i|br|ul)>)/);
+  }
 });

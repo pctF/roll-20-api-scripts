@@ -1,37 +1,48 @@
 # TTG Import
 
-Imports monsters/NPCs from [5e14.ttg.club](https://5e14.ttg.club/bestiary) into
-the **D&D 5E by Roll20** character sheet (NPC mode), and magic items into
-handouts, in Russian, as they appear on the site.
+Imports monsters/NPCs from [5e14.ttg.club](https://5e14.ttg.club/bestiary) or
+[dnd.su](https://dnd.su/bestiary/) into the **D&D 5E by Roll20** character sheet
+(NPC mode), and magic items into handouts, in Russian, as they appear on the site.
 
 ## Highlights
 
-- One click on ttg.club, one paste into Roll20 chat.
+- One click on ttg.club or dnd.su, one paste into Roll20 chat.
 - Fills stat block: type, AC, HP + formula, speed, abilities, saves, skills,
   resistances/immunities, senses, languages, CR, XP.
 - Traits, actions, bonus actions, reactions, legendary actions go into the
   sheet's repeating sections. Attacks (`Рукопашная/Дальнобойная атака ...`)
   become rollable: to-hit, reach/range, target, up to two damage parts.
-- Monster description goes into the character bio.
+- Monster description goes into the character bio (on dnd.su also lair,
+  regional effects and other extra sections, under their titles).
 - Magic items become GM-only handouts: type, rarity, attunement, description.
 
 ## How to Use
 
-The Roll20 API sandbox can't make HTTP requests, and ttg.club doesn't allow
-cross-site requests from Roll20, so the fetch happens on ttg.club through a
-bookmarklet:
+The Roll20 API sandbox can't make HTTP requests, and neither site allows
+cross-site requests from Roll20, so the data is grabbed on the site itself by a
+bookmarklet (one per site):
 
 1. Install `main.js` as an API script in your game (game must use the
    "D&D 5E by Roll20" sheet).
-2. Create a browser bookmark and set its URL to:
+2. Create a browser bookmark and set its URL to one of these.
+
+   **dnd.su**:
+
+   ```
+   javascript:(async()=>{const c=document.querySelector('.card.active[data-id]');if(!c||!/^(bestiary|items):/.test(c.dataset.id))return alert('Открой страницу монстра или магического предмета на dnd.su');const h=c.querySelector('.card__body').innerHTML.replace(/<sup[\s\S]*?<\/sup>/g,'').replace(/<(\/?)(\w+)[^>]*>/g,(_,s,t)=>(t=t.toLowerCase(),/^(li|h3|p|strong|em|b|i|br|ul)$/.test(t)?'<'+s+t+'>':t=='div'?' ':'')).replace(/\s+/g,' ');const d={id:c.dataset.id,name:c.querySelector('.card-title [data-copy]').dataset.copy,html:h};await navigator.clipboard.writeText('!dndsu '+JSON.stringify(d).replace(/[%<>&"\[\]{}@#|\\]/g,encodeURIComponent));alert('Скопировано: '+d.name+'. Вставь в чат Roll20.')})()
+   ```
+
+   **5e14.ttg.club**:
 
    ```
    javascript:(async()=>{const m=location.pathname.match(/^\/(bestiary|items\/magic)\/([^/?#]+)/);if(!m)return alert('Открой страницу монстра или магического предмета на 5e14.ttg.club');const d=await(await fetch('/api/v1/'+m[1]+'/'+m[2],{method:'POST'})).json();delete d.tags;delete d.lair;delete d.images;const c='!ttg '+JSON.stringify(d).replace(/[%<>&"\[\]{}@#|\\]/g,encodeURIComponent);await navigator.clipboard.writeText(c);alert('Скопировано: '+d.name.rus+'. Вставь в чат Roll20.')})()
    ```
 
-3. Open a monster page, e.g. `https://5e14.ttg.club/bestiary/adult_red_dragon`,
-   or a magic item page, e.g. `https://5e14.ttg.club/items/magic/ring_of_protection`,
-   and click the bookmark.
+3. Open a monster page, e.g. `https://dnd.su/bestiary/108-adult-red-dragon/`,
+   `https://dnd.su/multiverse/bestiary/8259-githyanki-supreme-commander/` or
+   `https://5e14.ttg.club/bestiary/adult_red_dragon`, or a magic item page,
+   e.g. `https://dnd.su/items/94-ring-of-protection/` or
+   `https://5e14.ttg.club/items/magic/ring_of_protection`, and click the bookmark.
 4. Paste into Roll20 chat (as GM) and send. The script whispers a link to the
    new character or handout.
 5. Optional: select a token on the map before sending. It gets linked to the
@@ -45,17 +56,26 @@ bookmarklet:
 
 | Command | Who | Effect |
 | --- | --- | --- |
-| `!ttg <payload>` | GM | Creates an NPC character or a magic item handout from the bookmarklet payload. |
+| `!ttg <payload>` | GM | Creates an NPC character or a magic item handout from the ttg.club bookmarklet payload. |
+| `!dndsu <payload>` | GM | Same, from the dnd.su bookmarklet payload. |
 
 ## Implementation Notes
 
 - Data source: `POST /api/v1/bestiary/<slug>` and `/api/v1/items/magic/<slug>` (the same JSON the site page
   uses). `/api/v1/fvtt/bestiary` was rejected: it fails for many monsters and
   has wrong numbers (e.g. Adult Red Dragon's Frightful Presence DC).
+- dnd.su has no JSON API. Its bookmarklet sends `{id, name, html}`: the
+  card id (`bestiary:8259` / `items:94`), the card title and the card body
+  HTML with attributes and all tags except `li h3 p strong em b i br ul`
+  stripped (the same reduction as `simplifyDndSu` in `main.js`; keep them in
+  sync). `parseDndSu` turns that into the ttg JSON shape, so both sites share
+  one sheet writer. Item price ("Рекомендованная стоимость") goes into the
+  handout header.
 - Payload is the JSON with only chat-hostile characters (`[ ] { } @ # % | " < > & \`)
   percent-encoded, so Roll20 doesn't treat them as inline rolls/attribute
-  refs/macros; Cyrillic stays raw to keep the message short (~6 KB for an
-  adult dragon, ~15 KB for a lich with its long description).
+  refs/macros; Cyrillic stays raw to keep the message short (ttg: ~6 KB for an
+  adult dragon, ~15 KB for a lich with its long description; dnd.su: ~17 KB
+  for an adult red dragon with its lair and lore).
 - Attributes are written with `setWithWorker` so the sheet computes
   modifiers and the roll buttons of attack rows.
 - Not imported: token/avatar image (the API can only use images from your

@@ -1,9 +1,9 @@
 /// <reference path="../roll20.d.ts" />
 
 // TTG Import - Roll20 API Script
-// Imports monsters from https://5e14.ttg.club into "D&D 5E by Roll20" NPC sheets.
-// The Roll20 sandbox can't do HTTP, so a bookmarklet on ttg.club fetches the
-// monster JSON and copies `!ttg <payload>` to the clipboard. See README.md.
+// Imports monsters from https://5e14.ttg.club and https://dnd.su into "D&D 5E by Roll20"
+// NPC sheets, magic items into handouts. The Roll20 sandbox can't do HTTP, so a bookmarklet
+// on the site copies `!ttg <payload>` / `!dndsu <payload>` to the clipboard. See README.md.
 
 /**
  * @typedef {Object} TtgEntry
@@ -21,8 +21,16 @@
  * @property {string} description
  */
 
+/**
+ * @typedef {Object} ItemData
+ * @property {string} name
+ * @property {string[]} meta italic header lines (type, rarity, price)
+ * @property {string[]} paras description paragraphs, plain text
+ */
+
 (function () {
   var CMD = '!ttg';
+  var CMD_DNDSU = '!dndsu';
   var SPEAKER = 'TTG Import';
 
   var ABILITIES = [
@@ -43,6 +51,7 @@
     Анализ: 'investigation',
     Атлетика: 'athletics',
     Внимательность: 'perception',
+    Восприятие: 'perception', // dnd.su
     Выживание: 'survival',
     Выступление: 'performance',
     Запугивание: 'intimidation',
@@ -67,6 +76,7 @@
     laquo: '«',
     raquo: '»',
     hellip: '…',
+    thinsp: '\u2009',
     minus: '−',
     quot: '"',
     lt: '<',
@@ -109,10 +119,12 @@
     if (!m) return null;
     var hit = m[5];
     var damage = [];
-    var re = /\d+\s*\(([^)]*d[^)]*)\)\s*([^.,]*?)(?=\s+плюс|[.,]|$)/g;
+    // type goes after the dice on ttg ("7 (2d6) урона огнём"), before on dnd.su ("урон огнём 7 (2d6)")
+    var re = /([^.,\d()]*?)\s*\d+\s*\(([^)]*d[^)]*)\)\s*([^.,]*?)(?=\s*плюс\s|[.,]|$)/g;
     var d;
     while ((d = re.exec(hit))) {
-      damage.push({ formula: d[1].trim(), type: d[2].replace(/\s*урона?\s*/g, ' ').trim() });
+      var type = (d[3] || d[1]).toLowerCase().replace(/^\s*плюс(?=\s)|(^|\s)урона?(?=\s|$)/g, ' ');
+      damage.push({ formula: d[2].trim(), type: type.trim() });
     }
     return {
       type: m[1] === 'Рукопашная' ? 'Melee' : 'Ranged',
@@ -223,12 +235,15 @@
     var hpf = dice(d.hits.formula || '');
     if (d.hits.bonus) hpf += (d.hits.sign || ' + ').trim() + d.hits.bonus;
     setAttr(id, 'npc_hpformula', hpf);
+    // dnd.su gives speed and senses as ready text
     setAttr(
       id,
       'npc_speed',
-      (d.speed || [])
-        .map((/** @type {any} */ s) => (s.name ? s.name + ' ' : '') + s.value + ' фт.' + (s.additional ? ' (' + s.additional + ')' : ''))
-        .join(', ')
+      typeof d.speed === 'string'
+        ? d.speed
+        : (d.speed || [])
+            .map((/** @type {any} */ s) => (s.name ? s.name + ' ' : '') + s.value + ' фт.' + (s.additional ? ' (' + s.additional + ')' : ''))
+            .join(', ')
     );
 
     ABILITIES.forEach(function (a) {
@@ -262,9 +277,12 @@
     setAttr(id, 'npc_resistances', joinList(d.damageResistances));
     setAttr(id, 'npc_immunities', joinList(d.damageImmunities));
     setAttr(id, 'npc_condition_immunities', joinList(d.conditionImmunities));
-    var senses = ((d.senses && d.senses.senses) || []).map(
-      (/** @type {any} */ s) => s.name + ' ' + s.value + ' фт.' + (s.additional ? ' (' + s.additional + ')' : '')
-    );
+    var senses =
+      typeof d.senses === 'string'
+        ? [d.senses]
+        : ((d.senses && d.senses.senses) || []).map(
+            (/** @type {any} */ s) => s.name + ' ' + s.value + ' фт.' + (s.additional ? ' (' + s.additional + ')' : '')
+          );
     if (d.senses && d.senses.passivePerception) senses.push('пассивная Внимательность ' + d.senses.passivePerception);
     setAttr(id, 'npc_senses', senses.join(', '));
     setAttr(id, 'npc_languages', joinList(d.languages) || '—');
@@ -346,17 +364,230 @@
   }
 
   /**
-   * Creates a GM-only handout from a ttg /api/v1/items/magic/<slug> response.
-   * @param {any} d
+   * Creates a GM-only handout for a magic item.
+   * @param {ItemData} it
    * @returns {Handout}
    */
-  function importItem(d) {
-    var h = /** @type {Handout} */ (createObj('handout', { name: d.name.rus, inplayerjournals: '', archived: false }));
-    var meta = d.type.name + (d.specialRaw ? ' (' + d.specialRaw + ')' : '') + ', ' + d.rarity.name;
-    if (d.customization) meta += ' (требуется настройка)';
-    var paras = htmlToText(d.description).split('\n').filter(Boolean);
-    h.set('notes', ['<i>' + escapeHtml(meta) + '</i>'].concat(paras.map(escapeHtml)).map((p) => '<p>' + p + '</p>').join(''));
+  function importItem(it) {
+    var h = /** @type {Handout} */ (createObj('handout', { name: it.name, inplayerjournals: '', archived: false }));
+    var lines = it.meta.map((m) => '<i>' + escapeHtml(m) + '</i>').concat(it.paras.map(escapeHtml));
+    h.set('notes', lines.map((p) => '<p>' + p + '</p>').join(''));
     return h;
+  }
+
+  /**
+   * @param {any} d ttg payload: /api/v1/bestiary/<slug> or /api/v1/items/magic/<slug> response
+   * @returns {{ item?: ItemData, monster?: any } | null}
+   */
+  function fromTtg(d) {
+    if (d && d.name && d.rarity && d.description !== undefined) {
+      var meta = d.type.name + (d.specialRaw ? ' (' + d.specialRaw + ')' : '') + ', ' + d.rarity.name;
+      if (d.customization) meta += ' (требуется настройка)';
+      return { item: { name: d.name.rus, meta: [meta], paras: htmlToText(d.description).split('\n').filter(Boolean) } };
+    }
+    return d && d.name && d.hits && d.ability ? { monster: d } : null;
+  }
+
+  // ---- dnd.su ----
+  // No API there: the bookmarklet sends the card's HTML, reduced by simplifyDndSu.
+
+  /**
+   * Same reduction the dnd.su bookmarklet does before copying (keep README in sync): drops
+   * attributes and every tag except list/paragraph/emphasis ones, so the payload stays small.
+   * Idempotent, so raw card HTML and bookmarklet output parse the same.
+   * @param {string} html
+   */
+  function simplifyDndSu(html) {
+    return html
+      .replace(/<sup[\s\S]*?<\/sup>/g, '')
+      .replace(/<(\/?)(\w+)[^>]*>/g, function (_, close, tag) {
+        tag = tag.toLowerCase();
+        if (/^(li|h3|p|strong|em|b|i|br|ul)$/.test(tag)) return '<' + close + tag + '>';
+        return tag === 'div' ? ' ' : '';
+      })
+      .replace(/\s+/g, ' ');
+  }
+
+  /** @param {string} html */
+  function dndText(html) {
+    return htmlToText(html).replace(/(\d)к(\d)/g, '$1d$2');
+  }
+
+  /** "Волк [Wolf]" -> "Волк" @param {string} title */
+  function dndName(title) {
+    return title.replace(/\s*\[[^\]]*\]\s*$/, '').trim();
+  }
+
+  /**
+   * Contents of the top-level <li>s of the card's <ul class="params">.
+   * @param {string} html simplified card HTML
+   */
+  function topItems(html) {
+    /** @type {string[]} */
+    var items = [];
+    var depth = 0;
+    var start = 0;
+    var re = /<(\/?)(ul|li)>/g;
+    var m;
+    while ((m = re.exec(html))) {
+      if (m[2] === 'ul') depth += m[1] ? -1 : 1;
+      else if (depth === 1 && !m[1]) start = re.lastIndex;
+      else if (depth === 1) items.push(html.slice(start, m.index));
+    }
+    return items.filter((s) => s.trim());
+  }
+
+  /**
+   * Paragraph HTML strings of a section; nested list items become paragraphs.
+   * @param {string} html
+   */
+  function blocks(html) {
+    return html
+      .replace(/<li>/g, '<p>• ')
+      .replace(/<\/li>|<\/?ul>|<\/?h3>/g, '</p>')
+      .split(/<\/?p>/)
+      .filter((b) => dndText(b));
+  }
+
+  /**
+   * "<strong><em>Укус</em>.</strong> Рукопашная..." -> { name: "Укус", text: "Рукопашная..." }.
+   * A paragraph without a leading emphasized name, or whose emphasis ends with ":"
+   * (spell lists: "<strong>3/день каждое</strong>: ..."), gets name "".
+   * @param {string} html
+   */
+  function splitEntry(html) {
+    var m = html.match(/^\s*((?:<(?:strong|em|b|i)>\s*)+)([^<]*)/);
+    var after = m ? html.slice(m[0].length) : '';
+    if (!m || /:\s*$/.test(m[2]) || /^(?:<\/?(?:strong|em|b|i)>|\s)*:/.test(after)) return { name: '', text: dndText(html) };
+    return { name: dndText(m[2]).replace(/[.\s]+$/, ''), text: dndText(after).replace(/^[.\s]+/, '') };
+  }
+
+  /** @type {Record<string, string>} dnd.su section title -> ttg field */
+  var DNDSU_SECTIONS = {
+    '': 'feats',
+    Действия: 'actions',
+    'Бонусные действия': 'bonusActions',
+    Реакции: 'reactions',
+    'Легендарные действия': 'legendary',
+  };
+
+  /**
+   * Converts a dnd.su bestiary card into the ttg shape importMonster reads.
+   * @param {string} title card title, "Волк [Wolf]"
+   * @param {string} html card body HTML
+   */
+  function parseDndSu(title, html) {
+    /** @type {any} */
+    var d = { name: { rus: dndName(title) }, ability: {}, legendary: { count: 3, list: [] } };
+    /** @type {string[]} */
+    var desc = [];
+    /** @type {string[]} */
+    var bio = [];
+    topItems(simplifyDndSu(html)).forEach(function (li) {
+      if (/<p>|<h3>/.test(li)) {
+        var h = li.match(/^\s*<h3>([\s\S]*?)<\/h3>/);
+        var title = h ? dndText(h[1]) : '';
+        var body = h ? li.slice(h[0].length) : li;
+        var key = DNDSU_SECTIONS[title];
+        if (!key) {
+          // description first, then lair, optional rules etc. under their titles
+          var into = title === 'Описание' ? desc : bio;
+          if (into === bio) bio.push(title);
+          blocks(body).forEach((b) => into.push(dndText(b)));
+          return;
+        }
+        /** @type {TtgEntry[]} */
+        var list = key === 'legendary' ? d.legendary.list : (d[key] = d[key] || []);
+        blocks(body).forEach(function (b) {
+          var e = splitEntry(b);
+          var last = list[list.length - 1];
+          if (e.name || !last) {
+            var count = key === 'legendary' && !e.name && e.text.match(/(\d+)\s+легендарн/);
+            if (count) d.legendary.count = Number(count[1]);
+            else list.push({ name: e.name, value: escapeHtml(e.text) });
+          } else last.value += '\n' + escapeHtml(e.text); // spell list lines etc.
+        });
+        return;
+      }
+      var m = li.match(/^\s*<strong>([^<]*)<\/strong>([\s\S]*)$/);
+      if (!m) {
+        var text = dndText(li);
+        if (/^Сил\s+\d/.test(text)) {
+          text.replace(/(Сил|Лов|Тел|Инт|Мдр|Хар)\s+(\d+)/g, function (_, k, v) {
+            d.ability[SAVES[k]] = Number(v);
+            return '';
+          });
+        } else if (!d.size) {
+          // "Средний Гуманоид (гит), любое мировоззрение"; first word is the size
+          var sp = text.indexOf(' ');
+          d.size = { rus: text.slice(0, sp) };
+          d.type = { name: text.slice(sp + 1) };
+        }
+        return;
+      }
+      var label = dndText(m[1]).replace(/:$/, '');
+      var v = dndText(m[2]);
+      /** @param {string} s "+9" / "−1" */
+      var num = (s) => Number(s.replace('−', '-'));
+      var r;
+      if (label === 'Класс Доспеха') {
+        d.armorClass = parseInt(v, 10);
+        var armor = v.replace(/^\d+\s*/, '').replace(/^\((.*)\)$/, '$1');
+        d.armors = armor ? [{ name: armor }] : [];
+      } else if (label === 'Хиты' && (r = v.match(/^(\d+)\s*(?:\(([^)]*)\))?/))) {
+        d.hits = { average: Number(r[1]), formula: r[2] || '' };
+      } else if (label === 'Скорость') d.speed = v;
+      else if (label === 'Спасброски') {
+        d.savingThrows = [];
+        v.replace(/(Сил|Лов|Тел|Инт|Мдр|Хар)\s*([+−-]?\d+)/g, function (_, k, n) {
+          d.savingThrows.push({ shortName: k, value: num(n) });
+          return '';
+        });
+      } else if (label === 'Навыки') {
+        d.skills = v.split(/,\s*/).map(function (s) {
+          var sk = s.match(/^(.*?)\s*([+−-]\d+)$/);
+          return sk ? { name: sk[1], value: num(sk[2]) } : { name: s };
+        });
+      } else if (/^Уязвимост/.test(label)) d.damageVulnerabilities = [v];
+      else if (/^Сопротивлени/.test(label)) d.damageResistances = [v];
+      else if (/^Иммунитет к урон/.test(label)) d.damageImmunities = [v];
+      else if (/^Иммунитет к состояни/.test(label)) d.conditionImmunities = [v];
+      else if (label === 'Чувства') d.senses = v;
+      else if (label === 'Языки') d.languages = [v];
+      else if (label === 'Опасность' && (r = v.match(/^([\d/]+)(?:\s*\(([\d\s]+)опыт)?/))) {
+        d.challengeRating = r[1];
+        if (r[2]) d.experience = Number(r[2].replace(/\D/g, ''));
+      }
+    });
+    bio = desc.concat(bio);
+    if (bio.length) d.description = escapeHtml(bio.join('\n'));
+    return d;
+  }
+
+  /**
+   * @param {string} title
+   * @param {string} html
+   * @returns {ItemData}
+   */
+  function parseDndSuItem(title, html) {
+    /** @type {ItemData} */
+    var it = { name: dndName(title), meta: [], paras: [] };
+    topItems(simplifyDndSu(html)).forEach(function (li) {
+      if (/<p>/.test(li)) blocks(li).forEach((b) => it.paras.push(dndText(b)));
+      else if (dndText(li)) it.meta.push(dndText(li)); // "Кольцо, редкое (...)", "Рекомендованная стоимость: ..."
+    });
+    return it;
+  }
+
+  /**
+   * @param {any} d dnd.su payload: { id: "bestiary:8259" | "items:94", name: card title, html: card body }
+   * @returns {{ item?: ItemData, monster?: any } | null}
+   */
+  function fromDndSu(d) {
+    if (!d || typeof d.name !== 'string' || typeof d.html !== 'string') return null;
+    if (/^items:/.test(d.id)) return { item: parseDndSuItem(d.name, d.html) };
+    var m = /^bestiary:/.test(d.id) ? parseDndSu(d.name, d.html) : null;
+    return m && m.hits ? { monster: m } : null;
   }
 
   /**
@@ -368,24 +599,25 @@
   }
 
   on('chat:message', function (/** @type {ChatMessage} */ msg) {
-    if (msg.type !== 'api' || msg.content.split(' ')[0] !== CMD) return;
+    var cmd = msg.content.split(' ')[0];
+    if (msg.type !== 'api' || (cmd !== CMD && cmd !== CMD_DNDSU)) return;
+    var site = cmd === CMD ? '5e14.ttg.club' : 'dnd.su';
     if (!playerIsGM(msg.playerid)) return whisper(msg.who, 'Импорт доступен только GM.');
-    var payload = msg.content.slice(CMD.length).trim();
-    if (!payload) return whisper(msg.who, 'Использование: открой монстра на 5e14.ttg.club, нажми закладку, вставь сюда.');
+    var payload = msg.content.slice(cmd.length).trim();
+    if (!payload) return whisper(msg.who, 'Использование: открой монстра или магический предмет на ' + site + ', нажми закладку, вставь сюда.');
     var data;
     try {
       data = JSON.parse(decodeURIComponent(payload));
     } catch (e) {
       return whisper(msg.who, 'Не удалось разобрать данные: ' + e + '. Скопируй команду закладкой заново.');
     }
-    if (data && data.name && data.rarity && data.description !== undefined) {
-      var h = importItem(data);
+    var res = cmd === CMD ? fromTtg(data) : fromDndSu(data);
+    if (!res) return whisper(msg.who, 'Это не монстр или магический предмет с ' + site + '.');
+    if (res.item) {
+      var h = importItem(res.item);
       return whisper(msg.who, 'Импортирован: [' + h.get('name') + '](http://journal.roll20.net/handout/' + h.id + ')');
     }
-    if (!data || !data.name || !data.hits || !data.ability) {
-      return whisper(msg.who, 'Это не монстр или магический предмет с ttg.club.');
-    }
-    var ch = importMonster(data);
+    var ch = importMonster(res.monster);
     var sel = (msg.selected || []).find((s) => s._type === 'graphic');
     var token = sel && /** @type {Graphic | undefined} */ (getObj('graphic', sel._id));
     if (token) {
@@ -400,6 +632,6 @@
   });
 
   if (typeof __TEST_MODE__ !== 'undefined' && __TEST_MODE__) {
-    globalThis.__TEST_EXPORTS__ = { htmlToText: htmlToText, parseAttack: parseAttack };
+    globalThis.__TEST_EXPORTS__ = { htmlToText: htmlToText, parseAttack: parseAttack, parseDndSu: parseDndSu, simplifyDndSu: simplifyDndSu };
   }
 })();
